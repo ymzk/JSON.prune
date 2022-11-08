@@ -18,7 +18,6 @@
 	var DEFAULT_MAX_DEPTH = 6;
 	var DEFAULT_ARRAY_MAX_LENGTH = 50;
 	var DEFAULT_PRUNED_VALUE = '"-pruned-"';
-	var seen; // Same variable used for all stringifications
 	var iterator; // either forEachEnumerableOwnProperty, forEachEnumerableProperty or forEachProperty
 
 	// iterates on enumerable own properties (default behavior)
@@ -72,6 +71,7 @@
 
 	var prune = function (value, depthDecr, arrayMaxLength) {
 		var prunedString = DEFAULT_PRUNED_VALUE;
+		var seen;
 		var replacer;
 		if (typeof depthDecr == "object") {
 			var options = depthDecr;
@@ -86,10 +86,15 @@
 			if (options.replacer) {
 				replacer = options.replacer;
 			}
+			if (options.seen) {
+				seen = options.seen
+			}
 		} else {
 			iterator = forEachEnumerableOwnProperty;
 		}
-		seen = [];
+		if (seen === undefined) {
+			seen = [];
+		}
 		depthDecr = depthDecr || DEFAULT_MAX_DEPTH;
 		arrayMaxLength = arrayMaxLength || DEFAULT_ARRAY_MAX_LENGTH;
 		function str(key, holder, depthDecr) {
@@ -116,7 +121,7 @@
 				}
 				if (depthDecr<=0 || seen.indexOf(value)!==-1) {
 					if (replacer) {
-						var replacement = replacer(value, prunedString, true);
+						var replacement = replacer(value, prunedString, true, seen);
 						return replacement===undefined ? undefined : ''+replacement;
 					}
 					return prunedString;
@@ -129,7 +134,7 @@
 						partial[i] = str(i, value, depthDecr-1) || 'null';
 					}
 					v = '[' + partial.join(',') + ']';
-					if (replacer && value.length>arrayMaxLength) return replacer(value, v, false);
+					if (replacer && value.length>arrayMaxLength) return replacer(value, v, false, seen);
 					return v;
 				}
 				if (value instanceof RegExp) {
@@ -145,8 +150,17 @@
 				});
 				return '{' + partial.join(',') + '}';
 			case 'function':
+				if (depthDecr<=0 || seen.indexOf(value)!==-1) {
+					if (replacer) {
+						var replacement = replacer(value, prunedString, true, seen);
+						return replacement===undefined ? undefined : ''+replacement;
+					}
+					return prunedString;
+				}
+				seen.push(value);
+				return replacer ? replacer(value, undefined, false, seen) : undefined;
 			case 'undefined':
-				return replacer ? replacer(value, undefined, false) : undefined;
+				return replacer ? replacer(value, undefined, false, seen) : undefined;
 			}
 		}
 		return str('', {'': value}, depthDecr);
