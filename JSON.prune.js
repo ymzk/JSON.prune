@@ -87,7 +87,7 @@
 				replacer = options.replacer;
 			}
 			if (options.seen) {
-				seen = options.seen
+				seen = options.seen;
 			}
 		} else {
 			iterator = forEachEnumerableOwnProperty;
@@ -95,9 +95,24 @@
 		if (seen === undefined) {
 			seen = [];
 		}
-		depthDecr = depthDecr || DEFAULT_MAX_DEPTH;
-		arrayMaxLength = arrayMaxLength || DEFAULT_ARRAY_MAX_LENGTH;
+		if (depthDecr === undefined) {
+			depthDecr = DEFAULT_MAX_DEPTH;
+		}
+		if (arrayMaxLength === undefined) {
+			arrayMaxLength = DEFAULT_ARRAY_MAX_LENGTH;
+		}
 		function str(key, holder, depthDecr) {
+			function innerOptions() {
+				return {
+					depthDecr: depthDecr - 1,
+					arrayMaxLength: arrayMaxLength,
+					iterator: iterator,
+					prunedString: prunedString,
+					replacer: replacer,
+					seen: seen
+				};
+			}
+
 			var i, k, v, length, partial, value = holder[key];
 
 			if (value && typeof value === 'object' && typeof value.toPrunedJSON === 'function') {
@@ -121,7 +136,7 @@
 				}
 				if (depthDecr<=0 || seen.indexOf(value)!==-1) {
 					if (replacer) {
-						var replacement = replacer(value, prunedString, true, seen);
+						var replacement = replacer(value, prunedString, true, innerOptions());
 						return replacement===undefined ? undefined : ''+replacement;
 					}
 					return prunedString;
@@ -134,7 +149,9 @@
 						partial[i] = str(i, value, depthDecr-1) || 'null';
 					}
 					v = '[' + partial.join(',') + ']';
-					if (replacer && value.length>arrayMaxLength) return replacer(value, v, false, seen);
+					if (replacer && value.length>arrayMaxLength) {
+						return replacer(value, v, false, innerOptions());
+					}
 					return v;
 				}
 				if (value instanceof RegExp) {
@@ -152,15 +169,15 @@
 			case 'function':
 				if (depthDecr<=0 || seen.indexOf(value)!==-1) {
 					if (replacer) {
-						var replacement = replacer(value, prunedString, true, seen);
+						var replacement = replacer(value, prunedString, true, innerOptions());
 						return replacement===undefined ? undefined : ''+replacement;
 					}
 					return prunedString;
 				}
 				seen.push(value);
-				return replacer ? replacer(value, undefined, false, seen) : undefined;
+				return replacer ? replacer(value, undefined, false, innerOptions()) : undefined;
 			case 'undefined':
-				return replacer ? replacer(value, undefined, false, seen) : undefined;
+				return replacer ? replacer(value, undefined, false, innerOptions()) : undefined;
 			}
 		}
 		return str('', {'': value}, depthDecr);
